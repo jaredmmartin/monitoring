@@ -1,0 +1,424 @@
+---
+- become: true
+  gather_facts: true
+  hosts: "localhost"
+  vars:
+    vault_addr: "http://127.0.0.1:8100"
+
+  tasks:
+    - name: "packages"
+      block:
+        - name: "packages : update"
+          ansible.builtin.apt:
+            autoclean: true
+            autoremove: true
+            name: "*"
+            state: "latest"
+
+        - name: "packages : install"
+          ansible.builtin.apt:
+            name:
+              - "ca-certificates"
+              - "curl"
+              - "docker.io"
+              - "gnupg"
+            state: "present"
+            update_cache: true
+
+    - name: "docker"
+      block:
+        - name: "docker : enable monitoring"
+          ansible.builtin.copy:
+            content: '{"metrics-addr": "0.0.0.0:9323","experimental": true}'
+            dest: "/etc/docker/daemon.json"
+
+        - name: "docker : create /containers/monitoring"
+          ansible.builtin.file:
+            path: "/containers/monitoring"
+            state: "directory"
+
+    - name: "vault proxy"
+      block:
+        - name: "vault proxy : check proxy status"
+          ansible.builtin.uri:
+            url: "{{ vault_addr }}/v1/sys/health"
+            method: "GET"
+            status_code:
+              - 200
+              - 429
+              - 501
+              - 503
+              - 530
+          register: vault_health
+
+        - name: "vault proxy : assert proxy available"
+          ansible.builtin.assert:
+            fail_msg: "vault proxy is not available"
+            that:
+              - vault_health is not failed
+              - vault_health.status == 200
+            success_msg: "vault proxy is healthy"
+
+    - name: "components"
+      block:
+        - name: "influxdb"
+          block:
+            - name: "influxdb : get secrets"
+              ansible.builtin.uri:
+                url: "{{ vault_addr }}/v1/kv/data/monitoring/influxdb"
+                method: "GET"
+              register: influxdb_secrets
+
+            - name: "influxdb : directories"
+              ansible.builtin.file:
+                path: "{{ item }}"
+                state: directory
+              loop:
+                - "/containers/monitoring/influxdb"
+                - "/containers/monitoring/influxdb/config"
+                - "/containers/monitoring/influxdb/data"
+
+            - name: "influxdb : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                env:
+                  DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "{{ influxdb_secrets.json.data.data.DOCKER_INFLUXDB_INIT_ADMIN_TOKEN }}"
+                  DOCKER_INFLUXDB_INIT_BUCKET: "lab"
+                  DOCKER_INFLUXDB_INIT_MODE: "setup"
+                  DOCKER_INFLUXDB_INIT_ORG: "lab"
+                  DOCKER_INFLUXDB_INIT_PASSWORD: "{{ influxdb_secrets.json.data.data.DOCKER_INFLUXDB_INIT_PASSWORD }}"
+                  DOCKER_INFLUXDB_INIT_USERNAME: "{{ influxdb_secrets.json.data.data.DOCKER_INFLUXDB_INIT_USERNAME }}"
+                image: "influxdb:latest"
+                name: "influxdb"
+                ports:
+                  - "8086:8086"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/influxdb/config:/etc/influxdb2"
+                  - "/containers/monitoring/influxdb/data:/var/lib/influxdb2"
+
+        - name: "telegraf"
+          block:
+            - name: "telegraf : get secrets"
+              ansible.builtin.uri:
+                url: "{{ vault_addr }}/v1/kv/data/monitoring/telegraf"
+                method: "GET"
+              register: telegraf_secrets
+
+            - name: "telegraf : config"
+              ansible.builtin.template:
+                src: "files/telegraf.conf"
+                dest: "/containers/monitoring"
+
+            - name: "telegraf : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "telegraf"
+                name: "telegraf"
+                ports:
+                  - "6514:6514"
+                  - "8092:8092/udp"
+                  - "8094:8094"
+                  - "8125:8125/udp"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/telegraf.conf:/etc/telegraf/telegraf.conf"
+
+        - name: "prometheus"
+          block:
+            - name: "prometheus : copy config"
+              ansible.builtin.copy:
+                src: "files/prometheus.yml"
+                dest: "/containers/monitoring"
+
+            - name: "prometheus : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "prom/prometheus"
+                name: "prometheus"
+                ports:
+                  - "9090:9090"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+        - name: "prometheus pushgateway"
+          block:
+            - name: "prometheus pushgateway : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "prom/pushgateway"
+                name: "pushgateway"
+                ports:
+                  - "9091:9091"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+
+        - name: "grafana"
+          block:
+            - name: "grafana : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "grafana/grafana"
+                name: "grafana"
+                ports:
+                  - "9003:3000"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/grafana:/var/lib/grafana"
+
+        - name: "loki"
+          block:
+            - name: "loki : copy config"
+              ansible.builtin.copy:
+                src: "files/loki.yml"
+                dest: "/containers/monitoring"
+
+            - name: "loki : run"
+              community.docker.docker_container:
+                command: "-config.file=/etc/loki/local-config.yaml"
+                container_default_behavior: "no_defaults"
+                image: "grafana/loki"
+                name: "loki"
+                ports:
+                  - "3100:3100"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/loki:/var/lib/loki"
+                  - "/containers/monitoring/loki.yml:/etc/loki/local-config.yaml"
+
+    - name: "metric sources"
+      block:
+        - name: "blackbox exporter"
+          block:
+            - name: "blackbox exporter : copy config"
+              ansible.builtin.copy:
+                src: "files/blackbox.yml"
+                dest: "/containers/monitoring"
+
+            - name: "blackbox exporter : run"
+              community.docker.docker_container:
+                command: "--config.file=/etc/blackbox_exporter/config.yml"
+                container_default_behavior: "no_defaults"
+                image: "prom/blackbox-exporter:latest"
+                name: "blackbox-exporter"
+                ports:
+                  - "9115:9115"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml"
+
+        - name: "cadvisor"
+          block:
+            - name: "cadvisor: run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "gcr.io/cadvisor/cadvisor:latest"
+                name: "cadvisor"
+                ports:
+                  - "9999:8080"
+                privileged: true
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                volumes:
+                  - "/:/rootfs:ro"
+                  - "/var/run:/var/run:rw"
+                  - "/sys:/sys:ro"
+                  - "/var/lib/docker/:/var/lib/docker:ro"
+
+        - name: "dns exporter"
+          block:
+            - name: "dns exporter : copy config"
+              ansible.builtin.copy:
+                src: "files/dns_exporter.yml"
+                dest: "/containers/monitoring"
+
+            - name: "dns exporter : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "tykling/dns_exporter:latest"
+                name: "dns_exporter"
+                ports:
+                  - "15353:15353"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                volumes:
+                  - "/containers/monitoring/dns_exporter.yml:/home/nonroot/dns_exporter.yml"
+
+        - name: "snmp_exporter"
+          block:
+            - name: "snmp exporter : configure"
+              ansible.builtin.copy:
+                dest: "/containers/monitoring"
+                src: "files/snmp.yml"
+
+            - name: "snmp exporter : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "prom/snmp-exporter:latest"
+                name: "snmp-exporter"
+                ports:
+                  - "9116:9116"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/snmp.yml:/etc/snmp_exporter/snmp.yml"
+
+        - name: "unpoller"
+          block:
+            - name: "unpoller : get secrets"
+              ansible.builtin.uri:
+                url: "{{ vault_addr }}/v1/kv/data/monitoring/unpoller"
+                method: "GET"
+              register: unpoller_secrets
+
+            - name: "unpoller : copy config"
+              ansible.builtin.template:
+                dest: "/containers/monitoring"
+                src: "files/up.conf"
+
+            - name: "unpoller : run"
+              community.docker.docker_container:
+                container_default_behavior: "no_defaults"
+                image: "ghcr.io/unpoller/unpoller:latest"
+                name: "unpoller"
+                ports:
+                  - "9130:9130"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/up.conf:/etc/unpoller/up.conf"
+                  - "/usr/local/lib/unpoller/web:/usr/local/lib/unpoller/web"
+
+    - name: "agents"
+      block:
+        - name: "prometheus node exporter"
+          block:
+            - name: "prometheus node exporter : get latest assets"
+              ansible.builtin.uri:
+                url: "https://api.github.com/repos/prometheus/node_exporter/releases/latest"
+                return_content: true
+              register: node_exporter_assets
+
+            - name: "prometheus node exporter : find download url"
+              ansible.builtin.set_fact:
+                node_exporter_download_url: >-
+                  {{
+                    (
+                      node_exporter_assets.json.assets
+                      | selectattr('name', 'match', '^node_exporter-.*\.linux-arm64\.tar\.gz$')
+                      | map(attribute='browser_download_url')
+                      | list
+                      | first
+                    )
+                  }}
+
+            - name: "prometheus node exporter : download"
+              ansible.builtin.get_url:
+                dest: "/tmp/"
+                url: "{{ node_exporter_download_url }}"
+              register: node_exporter_download
+
+            - name: "prometheus node exporter : extract"
+              ansible.builtin.unarchive:
+                dest: "/tmp/"
+                remote_src: true
+                src: "{{ node_exporter_download.dest }}"
+              register: node_exporter_extract
+
+            - name: "prometheus node exporter : copy"
+              ansible.builtin.copy:
+                dest: "/usr/local/bin/node_exporter"
+                mode: "0755"
+                remote_src: true
+                src: "{{ '/tmp/' + (node_exporter_extract.src | basename | regex_findall('(.*).tar.gz')) | first }}/node_exporter"
+
+            - name: "prometheus node exporter : create service"
+              ansible.builtin.copy:
+                content: |
+                  [Unit]
+                  Description=Prometheus node exporter
+                  Wants=network-online.target
+                  After=network-online.target
+
+                  [Service]
+                  Type=simple
+                  ExecStart=/usr/local/bin/node_exporter
+
+                  [Install]
+                  WantedBy=multi-user.target
+                dest: "/etc/systemd/system/node_exporter.service"
+
+            - name: "prometheus node exporter : enable"
+              ansible.builtin.service:
+                enabled: true
+                name: "node_exporter"
+                state: "started"
+
+        - name: "promtail"
+          block:
+            - name: "promtail : copy config"
+              ansible.builtin.copy:
+                dest: "/containers/monitoring/promtail.yml"
+                src: "files/promtail.yml"
+
+            - name: "promtail : run"
+              community.docker.docker_container:
+                command: "-config.file=/mnt/config/promtail-config.yaml"
+                container_default_behavior: "no_defaults"
+                image: "grafana/promtail"
+                links:
+                  - "loki"
+                name: "promtail"
+                pull: true
+                restart_policy: "always"
+                restart: true
+                state: "started"
+                tty: true
+                user: "0"
+                volumes:
+                  - "/containers/monitoring/promtail.yml:/mnt/config/promtail-config.yaml"
+                  - "/var/log:/var/log"

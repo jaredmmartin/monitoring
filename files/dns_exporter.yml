@@ -1,0 +1,10 @@
+---
+modules:
+  google_a:
+    query_type: "A"
+    server: "8.8.8.8"
+    family: "ipv4"
+  google_a_multi_resolver:
+    query_type: "A"
+    query_name: "google.com"
+    family: "ipv4"
