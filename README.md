@@ -103,6 +103,8 @@ flowchart
     class e13 animate_slow
 ```
 
+![Grafana dashboard example](readme-files/dashboard-1.png)
+
 ### Components
 
 + Collectors
