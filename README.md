@@ -102,9 +102,6 @@ flowchart LR
     class e13 animate_slow
 ```
 
-![Grafana dashboard example](readme-files/dashboard-1.png)
-Example Grafana dashboard
-
 ### Components
 
 + Collectors
@@ -197,6 +194,12 @@ ansible-playbook main.yml
 ```
 
 After applying the playbook, login to Grafana at `http://<ip>:9003`.
+
+<p align="center">
+  <img src="readme-files/dashboard-1.png" width="50%">
+  <br>
+  <em>Example Grafana dashboard</em>
+</p>
 
 ## Useful documentation
 
