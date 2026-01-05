@@ -8,8 +8,7 @@ An Ansible playbook that turns a single host into a self-contained monitoring st
 ---
 config:
   flowchart:
-    curve: 'bumpY'
-    defaultRenderer: 'elk'
+    curve: 'bump'
   themeVariables:
     fontFamily: 'monospace'
     fontSize: '12px'
@@ -20,7 +19,7 @@ config:
     secondaryColor: '#054165'
     edgeLabelBackground: 'transparent'
 ---
-flowchart
+flowchart LR
     subgraph components ["components (docker)"]
         %% Monitoring components
         subgraph collectors ["collectors"]
