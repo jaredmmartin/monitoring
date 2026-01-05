@@ -183,6 +183,8 @@ Secrets (passwords, tokens, etc.) for various components are retrieved from Hash
 | `kv/data/monitoring/telegraf` | `influxdb_token` | InfluxDB token for use by Telegraf |
 | `kv/data/monitoring/unpoller` | `influxdb_user` | InfluxDB username for use by Unifi unpoller exporter |
 | `kv/data/monitoring/unpoller` | `influxdb_pass` | InfluxDB password for use by Unifi unpoller exporter |
+| `kv/data/monitoring/unpoller` | `unifi_user` | Unifi control plane username for use by Unifi unpoller exporter |
+| `kv/data/monitoring/unpoller` | `unifi_pass` | Unifi control plane password for use by Unifi unpoller exporter |
 
 > [!NOTE]
 > The [jaredmartin/vault](https://github.com/jaredmmartin/vault) repository contains a playbook for setting up a simple HashiCorp Vault instance and Vault Proxy

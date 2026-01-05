@@ -6,24 +6,15 @@
     vault_addr: "http://127.0.0.1:8100"
 
   tasks:
-    - name: "packages"
-      block:
-        - name: "packages : update"
-          ansible.builtin.apt:
-            autoclean: true
-            autoremove: true
-            name: "*"
-            state: "latest"
-
-        - name: "packages : install"
-          ansible.builtin.apt:
-            name:
-              - "ca-certificates"
-              - "curl"
-              - "docker.io"
-              - "gnupg"
-            state: "present"
-            update_cache: true
+    - name: "packages : install"
+      ansible.builtin.apt:
+        name:
+          - "ca-certificates"
+          - "curl"
+          - "docker.io"
+          - "gnupg"
+        state: "present"
+        update_cache: true
 
     - name: "docker"
       block:
@@ -31,9 +22,15 @@
           ansible.builtin.copy:
             content: '{"metrics-addr": "0.0.0.0:9323","experimental": true}'
             dest: "/etc/docker/daemon.json"
+            group: "root"
+            mode: "0644"
+            owner: "root"
 
         - name: "docker : create /containers/monitoring"
           ansible.builtin.file:
+            group: "root"
+            mode: "0644"
+            owner: "root"
             path: "/containers/monitoring"
             state: "directory"
 
@@ -71,6 +68,9 @@
 
             - name: "influxdb : directories"
               ansible.builtin.file:
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 path: "{{ item }}"
                 state: directory
               loop:
@@ -112,8 +112,11 @@
 
             - name: "telegraf : config"
               ansible.builtin.template:
-                src: "files/telegraf.conf"
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
+                src: "files/telegraf.conf"
 
             - name: "telegraf : run"
               community.docker.docker_container:
@@ -138,8 +141,11 @@
           block:
             - name: "prometheus : copy config"
               ansible.builtin.copy:
-                src: "files/prometheus.yml"
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
+                src: "files/prometheus.yml"
 
             - name: "prometheus : run"
               community.docker.docker_container:
@@ -195,8 +201,11 @@
           block:
             - name: "loki : copy config"
               ansible.builtin.copy:
-                src: "files/loki.yml"
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
+                src: "files/loki.yml"
 
             - name: "loki : run"
               community.docker.docker_container:
@@ -222,8 +231,11 @@
           block:
             - name: "blackbox exporter : copy config"
               ansible.builtin.copy:
-                src: "files/blackbox.yml"
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
+                src: "files/blackbox.yml"
 
             - name: "blackbox exporter : run"
               community.docker.docker_container:
@@ -265,8 +277,11 @@
           block:
             - name: "dns exporter : copy config"
               ansible.builtin.copy:
-                src: "files/dns_exporter.yml"
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
+                src: "files/dns_exporter.yml"
 
             - name: "dns exporter : run"
               community.docker.docker_container:
@@ -287,6 +302,9 @@
             - name: "snmp exporter : configure"
               ansible.builtin.copy:
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 src: "files/snmp.yml"
 
             - name: "snmp exporter : run"
@@ -315,6 +333,9 @@
             - name: "unpoller : copy config"
               ansible.builtin.template:
                 dest: "/containers/monitoring"
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 src: "files/up.conf"
 
             - name: "unpoller : run"
@@ -359,6 +380,9 @@
             - name: "prometheus node exporter : download"
               ansible.builtin.get_url:
                 dest: "/tmp/"
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 url: "{{ node_exporter_download_url }}"
               register: node_exporter_download
 
@@ -372,7 +396,9 @@
             - name: "prometheus node exporter : copy"
               ansible.builtin.copy:
                 dest: "/usr/local/bin/node_exporter"
-                mode: "0755"
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 remote_src: true
                 src: "{{ '/tmp/' + (node_exporter_extract.src | basename | regex_findall('(.*).tar.gz')) | first }}/node_exporter"
 
@@ -391,6 +417,9 @@
                   [Install]
                   WantedBy=multi-user.target
                 dest: "/etc/systemd/system/node_exporter.service"
+                group: "root"
+                mode: "0644"
+                owner: "root"
 
             - name: "prometheus node exporter : enable"
               ansible.builtin.service:
@@ -403,6 +432,9 @@
             - name: "promtail : copy config"
               ansible.builtin.copy:
                 dest: "/containers/monitoring/promtail.yml"
+                group: "root"
+                mode: "0644"
+                owner: "root"
                 src: "files/promtail.yml"
 
             - name: "promtail : run"
