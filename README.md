@@ -104,6 +104,7 @@ flowchart
 ```
 
 ![Grafana dashboard example](readme-files/dashboard-1.png)
+Example Grafana dashboard
 
 ### Components
 
