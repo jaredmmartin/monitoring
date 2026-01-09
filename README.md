@@ -1,6 +1,6 @@
 # Monitoring
 
-An Ansible playbook that turns a single host into a self-contained monitoring stack (metrics, logs, network probes, and dashboards) running mostly in Docker containers.
+An Ansible playbook that turns a single host into a self-contained monitoring stack (metrics, logs, network probes, netflow data, and dashboards) running mostly in Docker containers.
 
 ## Overview
 
@@ -131,7 +131,7 @@ flowchart LR
 
 ### Ports
 
-| Component | Container port | External port |
+| Component | Container port | Host port |
 | --------- | -------------- | ------------- |
 | `blackbox_exporter` | 9115 | 9115 |
 | `cadvisor` | 8080 | 9999 |
@@ -144,7 +144,7 @@ flowchart LR
 | `prometheus` | 9090 | 9090 |
 | `promtail` | 9080 | 9080 |
 | `snmp_exporter` | 9116 | 9116 |
-| `telegraf` | 6514, 8092/udp, 8094, 8125/udp | 6514, 8092/udp, 8094, 8125/udp |
+| `telegraf` | 2055/udp, 6514, 8092/udp, 8094, 8125/udp | 6514, 8092/udp, 8094, 8125/udp |
 | `unifi_unpoller` | 9130 | 9130 |
 | Docker metrics endpoint | 9323 | 9323 |
 
@@ -173,6 +173,7 @@ Where applicable, Docker volumes persist data under `/containers/monitoring`.
 + Ubuntu or Debian based Linux server
 + Ansible 2.15+
   + `community.docker` Ansible collection
++ Hashicorp Vault with Vault Proxy
 
 ### Secrets
 
@@ -201,7 +202,7 @@ Secrets (passwords, tokens, etc.) for various components are retrieved from Hash
     ansible-playbook main.yml
     ```
 
-1. After applying the playbook, login to Grafana at `http://<ip>:9003`.
+1. After applying the playbook, login to Grafana at `http://<ip>:9003` and build some dashboards.
 
 <p align="center">
   <img src="readme-files/dashboard-1.png" width="50%">
