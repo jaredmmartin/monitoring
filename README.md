@@ -20,27 +20,27 @@ config:
     edgeLabelBackground: 'transparent'
 ---
 flowchart LR
-    subgraph components ["components (docker)"]
+    subgraph service ["monitoring service"]
         %% Monitoring components
-        subgraph collectors ["collectors"]
+        subgraph components ["components"]
             %% Nodes
             grafana["grafana"]:::grafana
             influxdb[("influxdb")]:::component
             loki["loki"]:::component
+            prometheus_pushgateway["prometheus pushgateway"]:::component
             prometheus["prometheus"]:::component
             telegraf["telegraf"]:::component
-            prometheus_pushgateway["prometheus pushgateway"]:::component
 
             %% Node links
             grafana e1@-- pulls from --> prometheus
             grafana e2@-- pulls from --> loki
             grafana e3@-- pulls from --> influxdb
-            telegraf e4@-- pushes to --> influxdb
             prometheus_pushgateway e5@-- pushes to --> prometheus
+            telegraf e4@-- pushes to --> influxdb
         end
 
         %% Monitoring sources
-        subgraph sources ["metric sources"]
+        subgraph sources ["metric/log sources"]
             %% Nodes
             blackbox_exporter["blackbox_exporter"]:::component
             cadvisor["cadvisor"]:::component
@@ -49,38 +49,42 @@ flowchart LR
             unifi_unpoller["unifi_unpoller"]:::component
 
             %% Node links
-            unifi_unpoller e6@-- pushes to --> influxdb
+            prometheus e10@-- scrapes --> snmp_exporter
+            prometheus e11@-- scrapes --> unifi_unpoller
             prometheus e7@-- scrapes --> blackbox_exporter
             prometheus e8@-- scrapes --> cadvisor
             prometheus e9@-- scrapes --> dns_exporter
-            prometheus e10@-- scrapes --> snmp_exporter
-            prometheus e11@-- scrapes --> unifi_unpoller
+            unifi_unpoller e6@-- pushes to --> influxdb
         end
     end
 
     %% Monitoring agents
-    subgraph agents ["monitored system(s)"]
+    subgraph remote_sources ["remote source(s)"]
         %% Nodes
-        promtail[["promtail"]]:::agent
-        prometheus_node_exporter[["prometheus node exporter"]]:::agent
-
+        netflow[["netflow"]]:::remote_source
+        prometheus_node_exporter[["prometheus node exporter"]]:::remote_source
+        promtail[["promtail"]]:::remote_source
+        syslog[["syslog"]]:::remote_source
+        
         %% Node links
         promtail e12@-- pushes to --> loki
         prometheus e13@-- scrapes --> prometheus_node_exporter
+        netflow e14@-- pushes to --> telegraf
+        syslog e15@-- pushes to --> telegraf
     end
 
     %% Node styles
-    classDef agent fill:#054165,stroke:#f5f1e9,stroke-width:2px,color:#f5f1e9
+    classDef remote_source fill:#054165,stroke:#f5f1e9,stroke-width:2px,color:#f5f1e9
     classDef component fill:#4f87a0,stroke:#f5f1e9,stroke-width:2px,color:#f5f1e9
     classDef grafana fill:#faa41a,stroke:#f5f1e9,stroke-width:2px,color:#054165
     classDef group fill:#f5f1e9,stroke:#f5f1e9,stroke-width:2px,color:#4f87a0
-    classDef docker fill:#333333,stroke:#737373,stroke-width:2px,color:#f5f1e9
+    classDef service fill:#333333,stroke:#737373,stroke-width:2px,color:#f5f1e9
 
     %% Assign group styles
-    collectors:::group
-    agents:::group
+    service:::service
+    components:::group
     sources:::group
-    components:::docker
+    remote_sources:::group
 
     %% Link styles
     classDef animate_fast stroke-dasharray: 7,1,stroke-dashoffset: 500,animation: dash 15s linear infinite
@@ -100,6 +104,8 @@ flowchart LR
     class e11 animate_slow
     class e12 animate_slow
     class e13 animate_slow
+    class e14 animate_slow
+    class e15 animate_slow
 ```
 
 ### Components
@@ -154,6 +160,7 @@ The `files` directory contains configuration files for each component:
 + `files/snmp.yml`: SNMP auth profiles and MIB walks for Synology and UniFi gear
 + `files/telegraf.conf`: syslog listener; forwards to InfluxDB with token from Vault
 + `files/up.conf`: UniFi Poller outputs (Prometheus + InfluxDB) and controller defaults
++ `vars/vars.yml`: Ansible variable file used to control which components are enabled and populate component configuration files
 
 During playbook execution, the configuration files are copied from `files/` into `/containers/monitoring/` on the target host.
 
@@ -187,13 +194,14 @@ Secrets (passwords, tokens, etc.) for various components are retrieved from Hash
 
 ## Usage
 
-To apply the playbook:
+1. Update the `vars/vars.yml` file with configuration parameters for the various components.
+1. Apply the playbook:
 
-```bash
-ansible-playbook main.yml
-```
+    ```bash
+    ansible-playbook main.yml
+    ```
 
-After applying the playbook, login to Grafana at `http://<ip>:9003`.
+1. After applying the playbook, login to Grafana at `http://<ip>:9003`.
 
 <p align="center">
   <img src="readme-files/dashboard-1.png" width="50%">

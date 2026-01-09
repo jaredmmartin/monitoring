@@ -1,0 +1,82 @@
+---
+# Switches to enable/disable setup of various metric sources
+metric_sources:
+  blackbox: true
+  cadvisor: true
+  dns: true
+  kubernetes_cluster: true
+  snmp: true
+  unifi: true
+
+# Blackbox exporter configurations
+blackbox_configs:
+  - name: "blackbox"
+    module: "http_2xx"
+    targets:
+      - "https://google.com"
+
+# DNS exporter configurations
+dns_configs:
+  - name: "dnsexp_google_a"
+    module: "google_a"
+    targets:
+      - "www.google.com"
+  - name: "dnsexp_google_a_multi_resolver"
+    module: "google_a_multi_resolver"
+    targets:
+      - "1.0.0.1"
+      - "1.1.1.1"
+      - "205.171.2.65"
+      - "205.171.3.65"
+      - "208.67.220.220"
+      - "208.67.222.222"
+      - "75.75.75.75"
+      - "75.75.76.76"
+      - "8.8.4.4"
+      - "8.8.8.8"
+
+# Generic scrape configurations (Prometheus exporter, etc.)
+generic_scrape_configs:
+  - name: "blackbox_exporter"
+    ip: "10.0.3.2"
+    port: "9115"
+  - name: "pushgateway"
+    ip: "10.0.3.2"
+    port: "9091"
+  - name: "pi"
+    ip: "10.0.3.2"
+    port: "9100"
+  - name: "pi_cadvisor"
+    ip: "10.0.3.2"
+    port: "9999"
+  - name: "pi_docker"
+    ip: "10.0.3.2"
+    port: "9323"
+
+# Kubernetes cluster configurations
+kubernetes_cluster_configs:
+  - name: "lab_k8s"
+    scheme: "http"
+    targets:
+      - "10.0.3.2:8080"
+    cluster_name: "k8s"
+
+# SNMP exporter configurations
+snmp_configs:
+  - name: "snmp_unifi_rt1"
+    ip: "10.0.3.1"
+    params:
+      auth:
+        - "public_v2"
+      module:
+        - "if_mib"
+        - "ip_mib"
+        - "ubiquiti_unifi"
+
+# Unifi exporter configurations
+unifi_configs:
+  - name: "unpoller"
+    address: "https://10.0.3.1"
+
+# Hashicorp Vault URL for secrets retrieval
+vault_addr: "http://127.0.0.1:8100"

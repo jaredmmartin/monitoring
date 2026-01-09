@@ -2,10 +2,25 @@
 - become: true
   gather_facts: true
   hosts: "localhost"
-  vars:
-    vault_addr: "http://127.0.0.1:8100"
+  vars_files:
+    - "vars/vars.yml"
 
   tasks:
+    - name: "get primary network interface"
+      ansible.builtin.set_fact:
+        net_interface: >-
+          {{
+            ansible_facts.interfaces
+            | reject('equalto', 'lo')
+            | map('extract', ansible_facts)
+            | selectattr('ipv4', 'defined')
+            | selectattr('ipv4.address', 'defined')
+            | selectattr('ipv4.address', 'ansible.utils.in_network', '10.0.3.0/24')
+            | map(attribute='device')
+            | first
+            | default(omit)
+          }}
+
     - name: "packages : install"
       ansible.builtin.apt:
         name:
@@ -116,7 +131,7 @@
                 group: "root"
                 mode: "0644"
                 owner: "root"
-                src: "files/telegraf.conf"
+                src: "templates/telegraf.conf"
 
             - name: "telegraf : run"
               community.docker.docker_container:
@@ -124,7 +139,9 @@
                 image: "telegraf"
                 name: "telegraf"
                 ports:
-                  - "6514:6514"
+                  - "2055:2055/udp"
+                  - "6514:6514/tcp"
+                  - "6514:6514/udp"
                   - "8092:8092/udp"
                   - "8094:8094"
                   - "8125:8125/udp"
@@ -140,12 +157,12 @@
         - name: "prometheus"
           block:
             - name: "prometheus : copy config"
-              ansible.builtin.copy:
+              ansible.builtin.template:
                 dest: "/containers/monitoring"
                 group: "root"
                 mode: "0644"
                 owner: "root"
-                src: "files/prometheus.yml"
+                src: "templates/prometheus.yml"
 
             - name: "prometheus : run"
               community.docker.docker_container:
@@ -228,6 +245,7 @@
     - name: "metric sources"
       block:
         - name: "blackbox exporter"
+          when: metric_sources.blackbox
           block:
             - name: "blackbox exporter : copy config"
               ansible.builtin.copy:
@@ -254,6 +272,7 @@
                   - "/containers/monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml"
 
         - name: "cadvisor"
+          when: metric_sources.cadvisor
           block:
             - name: "cadvisor: run"
               community.docker.docker_container:
@@ -274,6 +293,7 @@
                   - "/var/lib/docker/:/var/lib/docker:ro"
 
         - name: "dns exporter"
+          when: metric_sources.dns
           block:
             - name: "dns exporter : copy config"
               ansible.builtin.copy:
@@ -298,6 +318,7 @@
                   - "/containers/monitoring/dns_exporter.yml:/home/nonroot/dns_exporter.yml"
 
         - name: "snmp_exporter"
+          when: metric_sources.snmp
           block:
             - name: "snmp exporter : configure"
               ansible.builtin.copy:
@@ -323,6 +344,7 @@
                   - "/containers/monitoring/snmp.yml:/etc/snmp_exporter/snmp.yml"
 
         - name: "unpoller"
+          when: metric_sources.unifi
           block:
             - name: "unpoller : get secrets"
               ansible.builtin.uri:
@@ -336,7 +358,7 @@
                 group: "root"
                 mode: "0644"
                 owner: "root"
-                src: "files/up.conf"
+                src: "templates/up.conf"
 
             - name: "unpoller : run"
               community.docker.docker_container:

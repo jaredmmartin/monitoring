@@ -1,0 +1,126 @@
+global:
+  external_labels:
+    monitor: "node"
+  scrape_interval: 10s
+
+scrape_configs:
+{% if metric_sources.blackbox %}
+{% if blackbox_configs|length > 0 %}
+{% for item in blackbox_configs %}
+  - job_name: "{{ item.name }}"
+    metrics_path: "/probe"
+    params:
+      module: "{{ item.module }}"
+    static_configs:
+      - targets: {{ item.targets }}
+    relabel_configs:
+      - source_labels: ["__address__"]
+        target_label: "__param_target"
+      - source_labels: ["__param_target"]
+        target_label: "instance"
+      - target_label: "__address__"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:9115"
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if metric_sources.dns %}
+  - job_name: "dnsexp_internal"
+    scrape_interval: "10s"
+    metrics_path: "/metrics"
+    relabel_configs:
+      - target_label: "monitor"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:15353"
+    static_configs:
+      - targets:
+          - "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:15353"
+{% endif %}
+
+{% if metric_sources.dns %}
+{% if dns_configs|length > 0 %}
+{% for item in dns_configs %}
+  - job_name: "{{ item.name }}"
+    scrape_interval: "10s"
+    metrics_path: "/query"
+    params:
+      module:
+        - "{{ item.module }}"
+    relabel_configs:
+      - source_labels: ["__address__"]
+        target_label: "__param_query_name"
+      - source_labels: ["__address__"]
+        target_label: "instance"
+      - target_label: "__address__"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:15353"
+      - target_label: "monitor"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:15353"
+    static_configs:
+      - targets: {{ item.targets }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if generic_scrape_configs|length > 0 %}
+{% for item in generic_scrape_configs %}
+  - job_name: "{{ item.name }}"
+    static_configs:
+      - targets:
+          - "{{ item.ip }}:{{ item.port }}"
+{% endfor %}
+{% endif %}
+
+{% if metric_sources.kubernetes_cluster %}
+{% if kubernetes_cluster_configs|length > 0 %}
+{% for item in kubernetes_cluster_configs %}
+  - job_name: "{{ item.name }}"
+    honor_timestamps: true
+    metrics_path: "/metrics"
+    scheme: "{{ item.scheme }}"
+    static_configs:
+      - targets: {{ item.targets }}
+    metric_relabel_configs:
+      - target_label: "cluster"
+        replacement: "{{ item.cluster_name }}"
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if metric_sources.snmp %}
+{% if snmp_configs|length > 0 %}
+{% for item in snmp_configs %}
+  - job_name: "{{ item.name }}"
+    static_configs:
+      - targets:
+          - {{ item.ip }}
+    metrics_path: "/snmp"
+    params: {{ item.params}}
+    relabel_configs:
+      - source_labels: ["__address__"]
+        target_label: "__param_target"
+      - source_labels: ["__param_target"]
+        target_label: "instance"
+      - target_label: "__address__"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:9116"
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if metric_sources.unifi %}
+{% if unifi_configs|length > 0 %}
+{% for item in unifi_configs %}
+  - job_name: "{{ item.name }}"
+    scrape_interval: "30s"
+    static_configs:
+      - targets:
+          - {{ item.address }}
+    metrics_path: "/metrics"
+    relabel_configs:
+      - source_labels: ["__address__"]
+        target_label: "__param_target"
+      - source_labels: ["__param_target"]
+        target_label: "instance"
+      - target_label: "__address__"
+        replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:9130"
+{% endfor %}
+{% endif %}
+{% endif %}

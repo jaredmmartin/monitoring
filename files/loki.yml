@@ -2,16 +2,16 @@ analytics:
   reporting_enabled: false
 auth_enabled: false
 common:
-  instance_addr: 127.0.0.1
-  path_prefix: /tmp/loki
+  instance_addr: "127.0.0.1"
+  path_prefix: "/tmp/loki"
   replication_factor: 1
   ring:
     kvstore:
-      store: inmemory
+      store: "inmemory"
   storage:
     filesystem:
-      chunks_directory: /tmp/loki/chunks
-      rules_directory: /tmp/loki/rules
+      chunks_directory: "/tmp/loki/chunks"
+      rules_directory: "/tmp/loki/rules"
 query_range:
   results_cache:
     cache:
@@ -19,16 +19,16 @@ query_range:
         enabled: true
         max_size_mb: 100
 ruler:
-  alertmanager_url: http://localhost:9093
+  alertmanager_url: "http://127.0.0.1:9093"
 schema_config:
   configs:
-    - from: 2020-10-24
-      store: tsdb
-      object_store: filesystem
-      schema: v13
+    - from: "2020-10-24"
+      store: "tsdb"
+      object_store: "filesystem"
+      schema: "v13"
       index:
-        prefix: index_
-        period: 24h
+        prefix: "index_"
+        period: "24h"
 server:
   grpc_listen_port: 9096
   http_listen_port: 3100
