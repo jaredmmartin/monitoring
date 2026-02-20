@@ -2,6 +2,12 @@
 
 An Ansible playbook that turns a single host into a self-contained monitoring stack (metrics, logs, network probes, netflow data, and dashboards) running mostly in Docker containers.
 
+<p align="center">
+  <img src="readme-files/overview-1.gif">
+  <br>
+  <em>Dashboard examples</em>
+</p>
+
 ## Overview
 
 ```mermaid
