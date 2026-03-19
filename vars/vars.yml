@@ -26,16 +26,26 @@ dns_configs:
     name: "dnsexp_google_a_multi_resolver"
     module: "google_a_multi_resolver"
     targets:
+      # Adguard
+      - "94.140.14.14"
+      # Cloudflare
       - "1.0.0.1"
       - "1.1.1.1"
+      # CenturyLink
       - "205.171.2.65"
       - "205.171.3.65"
+      # Cisco Umbrella/OpenDNS
       - "208.67.220.220"
       - "208.67.222.222"
+      # Comcast/Xfinity
       - "75.75.75.75"
       - "75.75.76.76"
+      # Google
       - "8.8.4.4"
       - "8.8.8.8"
+      # Quad9
+      - "9.9.9.9"
+      - "149.112.112.112"
 
 # Generic scrape configurations (Prometheus exporter, etc.)
 generic_scrape_configs:
