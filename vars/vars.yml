@@ -17,11 +17,13 @@ blackbox_configs:
 
 # DNS exporter configurations
 dns_configs:
-  - name: "dnsexp_google_a"
+  - monitor_type: "domain"
+    name: "dnsexp_google_a"
     module: "google_a"
     targets:
       - "www.google.com"
-  - name: "dnsexp_google_a_multi_resolver"
+  - monitor_type: "server"
+    name: "dnsexp_google_a_multi_resolver"
     module: "google_a_multi_resolver"
     targets:
       - "1.0.0.1"
