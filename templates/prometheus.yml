@@ -46,8 +46,14 @@ scrape_configs:
       module:
         - "{{ item.module }}"
     relabel_configs:
+{% if item.monitor_type == 'domain' %}
       - source_labels: ["__address__"]
         target_label: "__param_query_name"
+{% endif %}
+{% if item.monitor_type == 'server' %}
+      - source_labels: ["__address__"]
+        target_label: "__param_server"
+{% endif %}
       - source_labels: ["__address__"]
         target_label: "instance"
       - target_label: "__address__"
@@ -55,7 +61,10 @@ scrape_configs:
       - target_label: "monitor"
         replacement: "{{ ansible_facts[net_interface]["ipv4"]["address"] }}:15353"
     static_configs:
-      - targets: {{ item.targets }}
+      - targets:
+{% for target in item.targets %}
+          - "{{ target }}"
+{% endfor %}
 {% endfor %}
 {% endif %}
 {% endif %}
